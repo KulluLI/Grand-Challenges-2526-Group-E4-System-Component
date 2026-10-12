@@ -1,0 +1,125 @@
+---
+title: "Grand Challenges E4 System Component"
+author: "Lara Inci Kullu"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(hrbrthemes)
+library(tinytex)
+library(readxl)
+library(car)
+library(mctest)
+library(olsrr)
+library(moments)
+library(randomForest)
+library(ranger)
+library(glmnet)
+library(xgboost)
+library(gbm)
+library(fastDummies)
+
+setwd("C:/Users/incik/OneDrive/Desktop/GT 25-26/Grand Challenges Group E4 System Component")
+
+hurricaneData <- read_csv("StormDetailsClean.csv") %>% 
+  as_tibble()
+
+hurricaneData = dummy_cols(hurricaneData, select_columns = c("HLRR"), remove_first_dummy = TRUE)
+#hurricaneData <- na.omit(hurricaneData)
+#hurricaneData$logPriority <- log(hurricaneData$Priority)
+
+hurricaneData <- hurricaneData[, sapply(hurricaneData, function(x) {
+  is.atomic(x) && length(unique(x)) > 1
+})]
+hurricaneData
+summary(hurricaneData)
+```
+**_Model Development_** \newline
+
+**Random Forest**
+
+```{r}
+noConsideration <- c("STATE", "COUNTY", "NRI_ID", "SOVI_RATNG", "SOVI_SPCTL", 
+                  "RESL_RATNG", "RESL_SPCTL", "RESL_VALUE", "EXPB", "EXPP", 
+                  "EXPA", "EXP_AREA", "HLRR", "EALB", "EALP", "EALA", "EALS", 
+                  "EALR", "ALRB", "ALRP", "ALRA", "ALR_NPCTL", "RISKV", "RISKR", 
+                  "UniqueLocation")
+
+restrictedData <- hurricaneData[, !(names(hurricaneData) %in% noConsideration)]
+
+modelHurricaneRF1 <- ranger(
+  dependent.variable.name = "Priority",
+  data = restrictedData,
+  num.trees = 500,
+  importance = "impurity"
+)
+
+#summary(modelHurricaneRF1)
+
+modelHurricaneRF1
+
+attach(modelHurricaneRF1)
+
+varImport <- variable.importance
+sort(varImport, decreasing = TRUE)
+
+detach()
+```
+
+```{r}
+modelHurricaneRF2 <- ranger(
+  formula = Priority ~ EXPPE + EXPT + POPULATION + BUILDVALUE,
+  data = hurricaneData,
+  num.trees = 500,
+  importance = "impurity"
+)
+
+#summary(modelHurricaneRF2)
+
+modelHurricaneRF2
+```
+```{r}
+modelHurricaneG1 <- glm(
+  Priority ~ . -STATE -COUNTY -NRI_ID -SOVI_RATNG -SOVI_SPCTL -RESL_RATNG -RESL_SPCTL -RESL_VALUE -EXPB -EXPP -EXPA -EXP_AREA -HLRR -EALB -EALP -EALA -EALS -EALR -ALRB -ALRP -ALRA -ALR_NPCTL -RISKV -RISKR -UniqueLocation,
+  family = Gamma(link = "log"),
+  data = hurricaneData
+)
+modelHurricaneG1
+summary(modelHurricaneG1)
+```
+
+```{r}
+modelHurricaneG2 <- glm(
+  Priority ~ POPULATION + AGRIVALUE + AREA + SOVI_SCORE + RESL_SCORE + EVNTS + AFREQ + HLRB + HLRP + HLRA + EALPE + EALT + RISKS + `HLRR_Relatively High` + `HLRR_Relatively Low` + `HLRR_Relatively Moderate` + `HLRR_Very High` + `HLRR_Very Low`,
+  family = Gamma(link = "log"),
+  data = hurricaneData
+)
+#modelHurricaneG2
+summary(modelHurricaneG2)
+```
+
+
+```{r}
+modelHurricaneLM1 <- lm(
+  Priority ~ . -STATE -COUNTY -NRI_ID -SOVI_RATNG -SOVI_SPCTL -RESL_RATNG -RESL_SPCTL -RESL_VALUE -EXPB -EXPP -EXPA -EXP_AREA -HLRR -EALB -EALP -EALA -EALS -EALR -ALRB -ALRP -ALRA -ALR_NPCTL -RISKV -RISKR -UniqueLocation,
+  data = hurricaneData
+)
+#modelHurricaneLM1
+summary(modelHurricaneLM1)
+```
+
+```{r}
+modelHurricaneLM2 <- lm(
+  Priority ~ POPULATION + SOVI_SCORE + EALPE + RISKS,
+  data = hurricaneData
+)
+# modelHurricaneLM2
+summary(modelHurricaneLM2)
+```
